@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// 1. Tài khoản người dùng
+model User {
+  id           String   @id @default(uuid())
+  fullName     String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  learningProgress    LearningProgress[]
+  userVocabulary      UserVocabulary[]
+  passwordResetTokens PasswordResetToken[]
+  quizAttempts        QuizAttempt[]
+}
+
+// 2. Khóa học
+model Course {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  level       String   @default("A1")
+  category    String?
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lessons Lesson[]
+}
+
+// 3. Bài học
+model Lesson {
+  id          String   @id @default(uuid())
+  courseId    String
+  title       String
+  description String?
+  content     String?
+  order       Int      @default(1)
+  createdAt   DateTime @default(now())
+
+  course           Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  learningProgress LearningProgress[]
+  vocabularies     Vocabulary[]
+  quizQuestions    QuizQuestion[]
+  quizAttempts     QuizAttempt[]
+
+  @@unique([courseId, order])
+}
+
+// 4. Từ vựng
+model Vocabulary {
+  id            String   @id @default(uuid())
+  lessonId      String
+  word          String
+  meaning       String
+  pronunciation String?
+  example       String?
+  createdAt     DateTime @default(now())
+
+  lesson         Lesson           @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  userVocabulary UserVocabulary[]
+}
+
+// 5. Tiến độ học tập
+model LearningProgress {
+  id          String    @id @default(uuid())
+  userId      String
+  lessonId    String
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+}
+
+// 6. Từ vựng người dùng đã học
+model UserVocabulary {
+  id           String   @id @default(uuid())
+  userId       String
+  vocabularyId String
+  isMastered   Boolean  @default(false)
+  learnedAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vocabulary Vocabulary @relation(fields: [vocabularyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, vocabularyId])
+}
+
+// 7. Mã khôi phục mật khẩu
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// 8. Loại câu hỏi
+enum QuestionType {
+  MULTIPLE_CHOICE
+  FILL_BLANK
+}
+
+// 9. Câu hỏi luyện tập
+model QuizQuestion {
+  id            String       @id @default(uuid())
+  lessonId      String
+  question      String
+  type          QuestionType @default(MULTIPLE_CHOICE)
+  options       String[]     @default([])
+  correctAnswer String
+  explanation   String?
+  order         Int          @default(1)
+  createdAt     DateTime     @default(now())
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, order])
+  @@index([lessonId])
+}
+
+// 10. Lịch sử luyện tập
+model QuizAttempt {
+  id             String   @id @default(uuid())
+  userId         String
+  lessonId       String
+  correctAnswers Int
+  totalQuestions Int
+  score          Int
+  createdAt      DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([lessonId])
+}
